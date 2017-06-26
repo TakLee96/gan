@@ -1,0 +1,1 @@
+cmd: latexmk -f -pdf -outdir=out index.tex
