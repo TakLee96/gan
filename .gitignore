@@ -99,3 +99,8 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# tak's own stuff
+.idea
+MNIST_data
+*_out
