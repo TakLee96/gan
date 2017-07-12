@@ -67,14 +67,14 @@ def plot(samples):
 G_sample = generator(Z)
 D_real, D_logit_real = discriminator(X)
 D_fake, D_logit_fake = discriminator(G_sample)
-# D_loss = -tf.reduce_mean(tf.log(D_real) + tf.log(1. - D_fake))
-# G_loss = -tf.reduce_mean(tf.log(D_fake))
+D_loss = -tf.reduce_mean(tf.log(D_real) + tf.log(1. - D_fake))
+G_loss = -tf.reduce_mean(tf.log(D_fake))
 # Alternative losses:
 # -------------------
-D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_real, labels=tf.ones_like(D_logit_real)))
-D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_fake, labels=tf.zeros_like(D_logit_fake)))
-D_loss = D_loss_real + D_loss_fake
-G_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_fake, labels=tf.ones_like(D_logit_fake)))
+# D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_real, labels=tf.ones_like(D_logit_real)))
+# D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_fake, labels=tf.zeros_like(D_logit_fake)))
+# D_loss = D_loss_real + D_loss_fake
+# G_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_fake, labels=tf.ones_like(D_logit_fake)))
 D_solver = tf.train.AdamOptimizer().minimize(D_loss, var_list=theta_D)
 G_solver = tf.train.AdamOptimizer().minimize(G_loss, var_list=theta_G)
 
@@ -91,7 +91,7 @@ if not os.path.exists('mnist_gan_out/'):
 
 
 i = 0
-for it in range(1000000):
+for it in range(30001):
     if it % 1000 == 0:
         samples = sess.run(G_sample, feed_dict={Z: sample_Z(16, Z_dim)})
         fig = plot(samples)
@@ -103,6 +103,6 @@ for it in range(1000000):
     _, G_loss_curr = sess.run([G_solver, G_loss], feed_dict={Z: sample_Z(mb_size, Z_dim)})
     if it % 1000 == 0:
         print('Iter: {}'.format(it))
-        print('D loss: {:.4}'.format(D_loss_curr))
+        print('D_loss: {:.4}'.format(D_loss_curr))
         print('G_loss: {:.4}'.format(G_loss_curr))
         print()
