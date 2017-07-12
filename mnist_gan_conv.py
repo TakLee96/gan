@@ -3,6 +3,7 @@ MNIST GAN with CNN
 """
 
 import os
+import sys
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -18,14 +19,18 @@ def discriminator(X, reuse=False):
     with tf.variable_scope("discriminator") as scope:
         images = tf.reshape(X, shape=[-1, 28, 28, 1])
         conv_layer_1 = tf.contrib.layers.conv2d(
-            inputs=images, num_outputs=32, kernel_size=3, stride=1, padding="SAME",
+            inputs=images, num_outputs=16, kernel_size=3, stride=1, padding="SAME",
             activation_fn=tf.nn.relu, trainable=True, scope="conv_layer_1", reuse=reuse,
             weights_initializer=tf.contrib.layers.xavier_initializer_conv2d())
+        pool_layer_1 = tf.contrib.layers.max_pool2d(
+            inputs=conv_layer_1, kernel_size=2, stride=2, padding="VALID")
         conv_layer_2 = tf.contrib.layers.conv2d(
-            inputs=conv_layer_1, num_outputs=32, kernel_size=3, stride=1, padding="SAME",
+            inputs=pool_layer_1, num_outputs=16, kernel_size=3, stride=1, padding="SAME",
             activation_fn=tf.nn.relu, trainable=True, scope="conv_layer_2", reuse=reuse,
             weights_initializer=tf.contrib.layers.xavier_initializer_conv2d())
-        features = tf.reshape(conv_layer_2, shape=[-1, 28 * 28 * 32])
+        pool_layer_2 = tf.contrib.layers.max_pool2d(
+            inputs=conv_layer_2, kernel_size=2, stride=2, padding="VALID")
+        features = tf.reshape(pool_layer_2, shape=[-1, 7 * 7 * 16])
         fc_layer_1 = tf.contrib.layers.fully_connected(
             inputs=features, num_outputs=128, activation_fn=tf.nn.relu, trainable=True, reuse=reuse,
             weights_initializer=tf.contrib.layers.xavier_initializer(), scope="fc_layer_1")
@@ -41,18 +46,22 @@ def generator(Z):
             inputs=Z, num_outputs=128, activation_fn=tf.nn.relu, trainable=True,
             weights_initializer=tf.contrib.layers.xavier_initializer())
         fc_layer_2 = tf.contrib.layers.fully_connected(
-            inputs=fc_layer_1, num_outputs=28 * 28 * 32, activation_fn=tf.nn.relu, trainable=True,
+            inputs=fc_layer_1, num_outputs=7 * 7 * 16, activation_fn=tf.nn.relu, trainable=True,
             weights_initializer=tf.contrib.layers.xavier_initializer())
-        features = tf.reshape(fc_layer_2, shape=[-1, 28, 28, 32])
-        conv_layer_1 = tf.contrib.layers.conv2d(
-            inputs=features, num_outputs=32, kernel_size=3, stride=1, padding="SAME",
+        features = tf.reshape(fc_layer_2, shape=[-1, 7, 7, 16])
+        deconv_layer_1 = tf.contrib.layers.conv2d_transpose(
+            inputs=features, num_outputs=16, kernel_size=3, stride=2, padding="SAME",
             activation_fn=tf.nn.relu, trainable=True,
             weights_initializer=tf.contrib.layers.xavier_initializer_conv2d())
-        conv_layer_2 = tf.contrib.layers.conv2d(
-            inputs=conv_layer_1, num_outputs=1, kernel_size=3, stride=1, padding="SAME",
+        deconv_layer_2 = tf.contrib.layers.conv2d_transpose(
+            inputs=deconv_layer_1, num_outputs=16, kernel_size=3, stride=2, padding="SAME",
+            activation_fn=tf.nn.relu, trainable=True,
+            weights_initializer=tf.contrib.layers.xavier_initializer_conv2d())
+        deconv_layer_3 = tf.contrib.layers.conv2d_transpose(
+            inputs=deconv_layer_2, num_outputs=1, kernel_size=3, stride=1, padding="SAME",
             activation_fn=tf.nn.sigmoid, trainable=True,
             weights_initializer=tf.contrib.layers.xavier_initializer_conv2d())
-        images = tf.reshape(conv_layer_2, shape=[-1, 784])
+        images = tf.reshape(deconv_layer_3, shape=[-1, 784])
     return images
 
 
@@ -99,8 +108,7 @@ if not os.path.exists('mnist_gan_conv_out/'):
 
 i = 0
 for it in range(1000000):
-    print(it)
-    if it % 100 == 0:
+    if it % 1000 == 0:
         samples = sess.run(G_sample, feed_dict={Z: sample_Z(16, Z_dim)})
         fig = plot(samples)
         plt.savefig('mnist_gan_conv_out/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
@@ -109,8 +117,11 @@ for it in range(1000000):
     X_mb, _ = mnist.train.next_batch(mb_size)
     _, D_loss_curr = sess.run([D_solver, D_loss], feed_dict={X: X_mb, Z: sample_Z(mb_size, Z_dim)})
     _, G_loss_curr = sess.run([G_solver, G_loss], feed_dict={Z: sample_Z(mb_size, Z_dim)})
-    if it % 100 == 0:
+    if it % 1000 == 0:
         print('Iter: {}'.format(it))
         print('D loss: {:.4}'.format(D_loss_curr))
         print('G_loss: {:.4}'.format(G_loss_curr))
+    if it % 100 == 0:
         print()
+    sys.stdout.write(".")
+    sys.stdout.flush()
