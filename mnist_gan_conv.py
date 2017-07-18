@@ -15,32 +15,49 @@ mb_size = 128
 Z_dim = 100
 
 
-X = tf.placeholder(tf.float32, shape=[None, 784])
-Z = tf.placeholder(tf.float32, shape=[None, Z_dim])
+X = tf.placeholder(tf.float32, shape=[None, 784], name="X")
+Z = tf.placeholder(tf.float32, shape=[None, Z_dim], name="Z")
+training = tf.placeholder(tf.bool, name="training")
 
 
 def discriminator(X, reuse=False):
     with tf.variable_scope("discriminator") as scope:
-        fc_layer_1 = tf.contrib.layers.fully_connected(
-            inputs=X, num_outputs=128, activation_fn=tf.nn.relu, trainable=True,
-            scope="fc_layer_1", reuse=reuse,
-            weights_initializer=tf.contrib.layers.xavier_initializer())
-        logit = tf.contrib.layers.fully_connected(
-            inputs=fc_layer_1, num_outputs=1, activation_fn=None, trainable=True,
-            scope="fc_layer_2", reuse=reuse,
-            weights_initializer=tf.contrib.layers.xavier_initializer())
-        prob = tf.nn.sigmoid(logit)
+        images = tf.reshape(X, shape=[-1, 28, 28, 1])
+        conv_layer_1 = tf.layers.conv2d(inputs=images,
+            filters=32, kernel_size=3, strides=2, padding="same", activation=tf.nn.relu, use_bias=False, reuse=reuse,
+            kernel_initializer=tf.contrib.layers.xavier_initializer_conv2d(), trainable=True, name="conv_layer_1")
+        batch_norm_1 = tf.layers.batch_normalization(inputs=conv_layer_1,
+            axis=-1, training=training, trainable=True, name="batch_norm_1", reuse=reuse)
+        conv_layer_2 = tf.layers.conv2d(inputs=batch_norm_1,
+            filters=64, kernel_size=3, strides=2, padding="same", activation=tf.nn.relu, use_bias=False, reuse=reuse,
+            kernel_initializer=tf.contrib.layers.xavier_initializer_conv2d(), trainable=True, name="conv_layer_2")
+        batch_norm_2 = tf.layers.batch_normalization(inputs=conv_layer_2,
+            axis=-1, training=training, trainable=True, name="batch_norm_2", reuse=reuse)
+        features = tf.reshape(batch_norm_2, shape=[-1, 7*7*64])
+        logit = tf.layers.dense(inputs=features,
+            units=1, activation=None, trainable=True, name="fc_layer", reuse=reuse, use_bias=False,
+            kernel_initializer=tf.contrib.layers.xavier_initializer())
+        prob = tf.nn.sigmoid(logit, "prob")
     return logit, prob
 
 
 def generator(Z):
     with tf.variable_scope("generator") as scope:
-        fc_layer_1 = tf.contrib.layers.fully_connected(
-            inputs=Z, num_outputs=128, activation_fn=tf.nn.relu, trainable=True, scope="fc_layer_1",
-            weights_initializer=tf.contrib.layers.xavier_initializer())
-        images = tf.contrib.layers.fully_connected(
-            inputs=fc_layer_1, num_outputs=784, activation_fn=tf.nn.sigmoid, trainable=True, scope="fc_layer_2",
-            weights_initializer=tf.contrib.layers.xavier_initializer())
+        fc_layer = tf.layers.dense(inputs=Z,
+            units=7*7*64, activation=None, trainable=True, name="fc_layer",
+            kernel_initializer=tf.contrib.layers.xavier_initializer())
+        batch_norm_1 = tf.layers.batch_normalization(inputs=fc_layer,
+            axis=-1, training=training, trainable=True, name="batch_norm_1")
+        features = tf.reshape(tf.nn.relu(batch_norm_1), shape=[-1, 7, 7, 64])
+        conv_layer_1 = tf.layers.conv2d_transpose(inputs=features,
+            filters=32, kernel_size=3, strides=2, padding="same", activation=None, use_bias=False,
+            kernel_initializer=tf.contrib.layers.xavier_initializer_conv2d(), trainable=True, name="conv_layer_1")
+        batch_norm_2 = tf.layers.batch_normalization(inputs=conv_layer_1,
+            axis=-1, training=training, trainable=True, name="batch_norm_2")
+        conv_layer_2 = tf.layers.conv2d_transpose(inputs=tf.nn.relu(batch_norm_2),
+            filters=1, kernel_size=3, strides=2, padding="same", activation=tf.nn.sigmoid, use_bias=False,
+            kernel_initializer=tf.contrib.layers.xavier_initializer_conv2d(), trainable=True, name="conv_layer_2")
+        images = tf.reshape(conv_layer_2, shape=[-1, 28*28*1])
     return images
 
 
@@ -88,16 +105,16 @@ if not os.path.exists('mnist_gan_conv_out/'):
 i = 0
 for it in range(200001):
     if it % 1000 == 0:
-        samples = sess.run(G_sample, feed_dict={Z: sample_Z(16, Z_dim)})
+        samples = sess.run(G_sample, feed_dict={Z: sample_Z(16, Z_dim), training: False})
         fig = plot(samples)
         plt.savefig('mnist_gan_conv_out/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
         i += 1
         plt.close(fig)
     X_mb, _ = mnist.train.next_batch(mb_size)
-    _, D_loss_curr = sess.run([D_solver, D_loss], feed_dict={X: X_mb, Z: sample_Z(mb_size, Z_dim)})
-    _, G_loss_curr = sess.run([G_solver, G_loss], feed_dict={Z: sample_Z(mb_size, Z_dim)})
+    _, D_loss_curr = sess.run([D_solver, D_loss], feed_dict={X: X_mb, Z: sample_Z(mb_size, Z_dim), training: True})
+    _, G_loss_curr = sess.run([G_solver, G_loss], feed_dict={Z: sample_Z(mb_size, Z_dim), training: True})
     if it % 1000 == 0:
-        D_r, D_f = sess.run([D_real, D_fake], feed_dict={X: X_mb, Z: sample_Z(mb_size, Z_dim)})
+        D_r, D_f = sess.run([D_real, D_fake], feed_dict={X: X_mb, Z: sample_Z(mb_size, Z_dim), training: False})
         print()
         print('Iter: {}'.format(it))
         print('D_loss: {:.4}'.format(D_loss_curr))
