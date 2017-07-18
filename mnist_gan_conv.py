@@ -24,16 +24,16 @@ def discriminator(X, reuse=False):
     with tf.variable_scope("discriminator") as scope:
         images = tf.reshape(X, shape=[-1, 28, 28, 1])
         conv_layer_1 = tf.layers.conv2d(inputs=images,
-            filters=32, kernel_size=3, strides=2, padding="same", activation=tf.nn.relu, use_bias=False, reuse=reuse,
+            filters=64, kernel_size=3, strides=2, padding="same", activation=tf.nn.relu, use_bias=False, reuse=reuse,
             kernel_initializer=tf.contrib.layers.xavier_initializer_conv2d(), trainable=True, name="conv_layer_1")
         batch_norm_1 = tf.layers.batch_normalization(inputs=conv_layer_1,
             axis=-1, training=training, trainable=True, name="batch_norm_1", reuse=reuse)
         conv_layer_2 = tf.layers.conv2d(inputs=batch_norm_1,
-            filters=64, kernel_size=3, strides=2, padding="same", activation=tf.nn.relu, use_bias=False, reuse=reuse,
+            filters=128, kernel_size=3, strides=2, padding="same", activation=tf.nn.relu, use_bias=False, reuse=reuse,
             kernel_initializer=tf.contrib.layers.xavier_initializer_conv2d(), trainable=True, name="conv_layer_2")
         batch_norm_2 = tf.layers.batch_normalization(inputs=conv_layer_2,
             axis=-1, training=training, trainable=True, name="batch_norm_2", reuse=reuse)
-        features = tf.reshape(batch_norm_2, shape=[-1, 7*7*64])
+        features = tf.reshape(batch_norm_2, shape=[-1, 7*7*128])
         logit = tf.layers.dense(inputs=features,
             units=1, activation=None, trainable=True, name="fc_layer", reuse=reuse, use_bias=False,
             kernel_initializer=tf.contrib.layers.xavier_initializer())
@@ -44,13 +44,13 @@ def discriminator(X, reuse=False):
 def generator(Z):
     with tf.variable_scope("generator") as scope:
         fc_layer = tf.layers.dense(inputs=Z,
-            units=7*7*64, activation=None, trainable=True, name="fc_layer",
+            units=7*7*128, activation=None, trainable=True, name="fc_layer",
             kernel_initializer=tf.contrib.layers.xavier_initializer())
         batch_norm_1 = tf.layers.batch_normalization(inputs=fc_layer,
             axis=-1, training=training, trainable=True, name="batch_norm_1")
-        features = tf.reshape(tf.nn.relu(batch_norm_1), shape=[-1, 7, 7, 64])
-        conv_layer_1 = tf.layers.conv2d_transpose(inputs=features,
-            filters=32, kernel_size=3, strides=2, padding="same", activation=None, use_bias=False,
+        features = tf.reshape(batch_norm_1, shape=[-1, 7, 7, 128])
+        conv_layer_1 = tf.layers.conv2d_transpose(inputs=tf.nn.relu(features),
+            filters=64, kernel_size=3, strides=2, padding="same", activation=None, use_bias=False,
             kernel_initializer=tf.contrib.layers.xavier_initializer_conv2d(), trainable=True, name="conv_layer_1")
         batch_norm_2 = tf.layers.batch_normalization(inputs=conv_layer_1,
             axis=-1, training=training, trainable=True, name="batch_norm_2")
@@ -66,8 +66,8 @@ def sample_Z(m, n):
 
 
 def plot(samples):
-    fig = plt.figure(figsize=(4, 4))
-    gs = gridspec.GridSpec(4, 4)
+    fig = plt.figure(figsize=(8, 8))
+    gs = gridspec.GridSpec(8, 8)
     gs.update(wspace=0.05, hspace=0.05)
     for i, sample in enumerate(samples):
         ax = plt.subplot(gs[i])
@@ -103,9 +103,9 @@ if not os.path.exists('mnist_gan_conv_out/'):
 
 
 i = 0
-for it in range(200001):
+for it in range(20001):
     if it % 1000 == 0:
-        samples = sess.run(G_sample, feed_dict={Z: sample_Z(16, Z_dim), training: False})
+        samples = sess.run(G_sample, feed_dict={Z: sample_Z(64, Z_dim), training: False})
         fig = plot(samples)
         plt.savefig('mnist_gan_conv_out/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
         i += 1
